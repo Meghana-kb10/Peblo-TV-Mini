@@ -726,16 +726,20 @@ def resolve_seed_blockers(db: Session = Depends(get_db), user: User = Depends(ge
         existing_types = {a.artwork_type for a in ep.artwork}
         for art_type in ["poster", "banner", "thumbnail"]:
             if art_type not in existing_types:
-                sample_file = f"/static/artwork/default_{'poster' if art_type=='poster' else 'banner' if art_type=='banner' else 'thumb'}.jpg"
+                sample_filename = f"default_{'poster' if art_type == 'poster' else 'banner' if art_type == 'banner' else 'thumb'}.jpg"
+                sample_file = f"/static/artwork/{sample_filename}"
+                w = 600 if art_type == "poster" else 1280 if art_type == "banner" else 640
+                h = 900 if art_type == "poster" else 720 if art_type == "banner" else 360
                 art = Artwork(
                     id=str(uuid.uuid4()),
                     episode_id=ep.id,
                     artwork_type=art_type,
-                    file_path=sample_file,
-                    width=600 if art_type == "poster" else 1280 if art_type == "banner" else 640,
-                    height=900 if art_type == "poster" else 720 if art_type == "banner" else 360,
-                    size_bytes=102400,
-                    content_type="image/jpeg"
+                    storage_path=f"artwork/{sample_filename}",
+                    url=sample_file,
+                    width=w,
+                    height=h,
+                    file_size_bytes=102400,
+                    aspect_ratio=round(w / h, 4)
                 )
                 db.add(art)
 

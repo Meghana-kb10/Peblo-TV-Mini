@@ -129,3 +129,22 @@ def test_validation_report_surfaces_every_deliberate_seed_blocker(db_session):
     )
     assert duplicate["entity_id"] == "motis-many-lives-s01e02"
     assert duplicate["language"] == "hi"
+
+
+def test_resolve_seed_blockers_endpoint(db_session):
+    seed_challenge_data(db_session)
+    report_before = generate_validation_report(db_session)
+    assert report_before["is_publishable"] is False
+    assert report_before["blocking_count"] == 5
+
+    from backend.app.api.admin import resolve_seed_blockers
+    from backend.app.api.auth import User
+    admin_user = User(username="admin_user", role="admin")
+    result = resolve_seed_blockers(db=db_session, user=admin_user)
+    assert result["success"] is True
+    assert result["is_publishable"] is True
+    assert result["blocking_count"] == 0
+
+    report_after = generate_validation_report(db_session)
+    assert report_after["is_publishable"] is True
+    assert report_after["blocking_count"] == 0
