@@ -72,6 +72,7 @@ def test_atomic_publish_and_collapsing(db_session, test_storage):
     storage = get_storage()
     catalog = storage.read_json("catalog/catalogue.json")
     assert catalog is not None
+    assert catalog["publish_run_id"] == result["run_id"]
 
     # Check sections
     featured = next(s for s in catalog["sections"] if s["section_id"] == "featured")
@@ -94,3 +95,29 @@ def test_atomic_publish_and_collapsing(db_session, test_storage):
     assert collapsed["content_group"] == "cg_ep1"
     assert "en" in collapsed["languages"] and "hi" in collapsed["languages"]
     assert len(collapsed["variants"]) == 2
+
+def test_blocked_publish_records_failed_run(db_session, test_storage):
+    from backend.app.models.publish_run import PublishRun
+    from backend.app.services.publisher import PublishingError
+
+    # Create an invalid show (status published, but section is None)
+    show_bad = Show(
+        slug="blocked-show",
+        title="Blocked Show",
+        section=None,
+        status="published"
+    )
+    db_session.add(show_bad)
+    db_session.commit()
+
+    # Attempt publish - must raise PublishingError
+    with pytest.raises(PublishingError) as exc:
+        compile_and_publish_catalog(db_session, triggered_by="audit_admin")
+    assert "blocking validation issue" in str(exc.value)
+
+    # Verify a failed run was recorded in publish_runs
+    failed_run = db_session.query(PublishRun).filter(PublishRun.triggered_by == "audit_admin").first()
+    assert failed_run is not None
+    assert failed_run.status == "failed"
+    assert "Publish blocked" in failed_run.error_details
+

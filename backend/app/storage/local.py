@@ -35,6 +35,11 @@ class LocalStorageBackend(StorageBackend):
         with open(target_path, "rb") as f:
             return f.read()
 
+    def delete_file(self, relative_path: str) -> None:
+        target_path = self._resolve_path(relative_path)
+        if target_path.exists():
+            target_path.unlink()
+
     def atomic_write_json(self, data: Any, target_filename: str) -> str:
         """
         Atomically writes JSON to target_filename using a temporary file and os.replace.

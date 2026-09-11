@@ -1,10 +1,24 @@
 import pytest
 from backend.app.storage import get_storage
+from backend.app.models.publish_run import PublishRun
 
 @pytest.fixture
-def mock_published_catalog(test_storage):
+def mock_published_catalog(db_session, test_storage):
+    run_id = "search-catalogue-run"
+    db_session.add(PublishRun(
+        id=run_id,
+        triggered_by="test_admin",
+        status="success",
+        show_count=2,
+        episode_count=3,
+        duration_ms=1,
+        catalogue_path="catalog/catalogue.json",
+    ))
+    db_session.commit()
+
     catalog_data = {
         "catalogue_version": "1.0.0",
+        "publish_run_id": run_id,
         "sections": [
             {
                 "section_id": "featured",

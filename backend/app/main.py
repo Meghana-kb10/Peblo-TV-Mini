@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -6,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.core.config import settings
-from backend.app.db.session import init_db
 from backend.app.db.seed import seed_database
 from backend.app.api.admin import router as admin_router
 from backend.app.api.catalog import router as catalog_router
@@ -14,13 +12,9 @@ from backend.app.api.health import router as health_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize database and seed initial shows
-    print(f"[{settings.PROJECT_NAME}] Starting up. Initializing database schema...")
-    init_db()
-    try:
-        seed_database(force=False)
-    except Exception as e:
-        print(f"[{settings.PROJECT_NAME}] Seed notice: {e}")
+    # Seed startup applies Alembic migrations before importing content.
+    print(f"[{settings.PROJECT_NAME}] Starting up. Applying database migrations...")
+    seed_database(force=False)
     yield
     print(f"[{settings.PROJECT_NAME}] Shutting down.")
 

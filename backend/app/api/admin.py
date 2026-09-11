@@ -561,6 +561,23 @@ async def upload_artwork(
     """
     content = await file.read()
 
+    # Validate target entity existence before proceeding
+    if not episode_id and not show_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Must specify either 'show_id' or 'episode_id' for uploaded artwork."
+        )
+
+    if episode_id:
+        target_ep = db.query(Episode).filter(Episode.id == episode_id).first()
+        if not target_ep:
+            raise HTTPException(status_code=404, detail=f"Episode '{episode_id}' not found.")
+        show_id = None  # Ensure it is attached specifically to the episode
+    elif show_id:
+        target_show = db.query(Show).filter(Show.id == show_id).first()
+        if not target_show:
+            raise HTTPException(status_code=404, detail=f"Show '{show_id}' not found.")
+
     # Strict server-side validation using Pillow
     try:
         width, height, aspect_ratio, img_format = validate_artwork(content, artwork_type)

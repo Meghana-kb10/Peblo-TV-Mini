@@ -74,6 +74,7 @@ def analyze():
             seen[key] = s
     print(f"\n[C] Duplicate (content_group, language) ({len(dupes)} duplicates):")
     for dup, orig in dupes:
+        key = (dup.get('content_group'), dup.get('language'))
         print(f"  • Duplicate key: {key}")
         print(f"    - Original: {orig['episode_id']} title='{orig['episode_title']}'")
         print(f"    - Duplicate: {dup['episode_id']} title='{dup['episode_title']}'")

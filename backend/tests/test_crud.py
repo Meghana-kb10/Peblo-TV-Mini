@@ -181,3 +181,54 @@ def test_episode_crud_and_validations(client):
     resp = client.delete(f"/admin/episodes/{ep_id}", headers={"X-User-Role": "editor"})
     assert resp.status_code == 200
     assert resp.json()["deleted"] is True
+
+def test_artwork_upload_endpoint(client):
+    from pathlib import Path
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    good_poster = base_dir / "poster_good.jpg"
+
+    # 1. Setup a valid show
+    resp = client.post("/admin/shows", json={
+        "title": "Artwork Test Show",
+        "slug": "artwork-test-show",
+        "section": "featured",
+        "status": "published"
+    }, headers={"X-User-Role": "editor"})
+    assert resp.status_code == 201
+    show_id = resp.json()["id"]
+
+    # 2. Upload without show_id or episode_id fails (400)
+    with open(good_poster, "rb") as f:
+        resp = client.post(
+            "/admin/artwork/upload",
+            data={"artwork_type": "poster"},
+            files={"file": ("poster.jpg", f.read(), "image/jpeg")},
+            headers={"X-User-Role": "editor"}
+        )
+    assert resp.status_code == 400
+    assert "Must specify either" in resp.json()["detail"]
+
+    # 3. Upload with non-existent show_id fails (404)
+    with open(good_poster, "rb") as f:
+        resp = client.post(
+            "/admin/artwork/upload",
+            data={"artwork_type": "poster", "show_id": "nonexistent_id"},
+            files={"file": ("poster.jpg", f.read(), "image/jpeg")},
+            headers={"X-User-Role": "editor"}
+        )
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"]
+
+    # 4. Upload with valid show_id succeeds (200)
+    with open(good_poster, "rb") as f:
+        resp = client.post(
+            "/admin/artwork/upload",
+            data={"artwork_type": "poster", "show_id": show_id},
+            files={"file": ("poster.jpg", f.read(), "image/jpeg")},
+            headers={"X-User-Role": "editor"}
+        )
+    assert resp.status_code == 200
+    assert resp.json()["artwork_type"] == "poster"
+    assert resp.json()["width"] == 600
+    assert resp.json()["height"] == 900
+

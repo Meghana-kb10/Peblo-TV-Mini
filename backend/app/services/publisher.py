@@ -28,6 +28,7 @@ def compile_and_publish_catalog(db: Session, triggered_by: str = "admin") -> Dic
     - Logs publish run in database
     """
     start_time = time.time()
+    run_id = str(uuid.uuid4())
     storage = get_storage()
     ref = load_reference()
     allowed_sections = ref.get("sections", ["featured", "series", "minisodes", "songs"])
@@ -184,6 +185,7 @@ def compile_and_publish_catalog(db: Session, triggered_by: str = "admin") -> Dic
 
     catalog_data = {
         "catalogue_version": "1.0.0",
+        "publish_run_id": run_id,
         "published_at": datetime.now(timezone.utc).isoformat(),
         "published_by": triggered_by,
         "counts": {
@@ -200,7 +202,7 @@ def compile_and_publish_catalog(db: Session, triggered_by: str = "admin") -> Dic
     # 4. Record successful publish run
     duration_ms = int((time.time() - start_time) * 1000)
     run_record = PublishRun(
-        id=str(uuid.uuid4()),
+        id=run_id,
         triggered_by=triggered_by,
         status="success",
         show_count=total_shows_published,

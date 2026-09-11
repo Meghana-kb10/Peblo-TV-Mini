@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from PIL import Image
 from backend.app.core.config import settings
-from backend.app.db.session import SessionLocal, init_db
+from backend.app.db.session import SessionLocal, run_migrations
 from backend.app.models.show import Show
 from backend.app.models.season import Season
 from backend.app.models.episode import Episode
@@ -15,7 +15,8 @@ def seed_database(force: bool = False):
     Ingests seed_shows.json into the database.
     Idempotent: skips if database already contains shows unless force=True.
     """
-    init_db()
+    # Alembic, not SQLAlchemy metadata creation, owns the application schema.
+    run_migrations()
     db = SessionLocal()
 
     try:

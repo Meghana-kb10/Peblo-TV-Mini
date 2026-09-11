@@ -51,6 +51,12 @@ class CloudflareR2StorageBackend(StorageBackend):
         resp = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
         return resp["Body"].read()
 
+    def delete_file(self, relative_path: str) -> None:
+        if not self.s3_client:
+            raise RuntimeError("R2 client not initialized.")
+        key = relative_path.replace("\\", "/").lstrip("/")
+        self.s3_client.delete_object(Bucket=self.bucket_name, Key=key)
+
     def atomic_write_json(self, data: Any, target_filename: str) -> str:
         """
         S3/R2 PutObject is inherently atomic at the object boundary.
@@ -63,8 +69,20 @@ class CloudflareR2StorageBackend(StorageBackend):
         try:
             raw = self.get_file(target_filename)
             return json.loads(raw.decode("utf-8"))
-        except Exception:
-            return None
+        except Exception as exc:
+            # A missing object is an expected "not published" state. Network,
+            # authentication, and malformed-object failures must be visible to
+            # health/readiness rather than being treated as a missing catalogue.
+            try:
+                from botocore.exceptions import ClientError
+
+                if isinstance(exc, ClientError):
+                    code = exc.response.get("Error", {}).get("Code")
+                    if code in {"404", "NoSuchKey", "NoSuchObject"}:
+                        return None
+            except ImportError:
+                pass
+            raise
 
     def get_public_url(self, relative_path: str) -> str:
         key = relative_path.replace("\\", "/").lstrip("/")

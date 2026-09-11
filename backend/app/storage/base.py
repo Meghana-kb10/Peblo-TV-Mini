@@ -19,6 +19,11 @@ class StorageBackend(ABC):
         pass
 
     @abstractmethod
+    def delete_file(self, relative_path: str) -> None:
+        """Deletes a file after a successful temporary health probe."""
+        pass
+
+    @abstractmethod
     def atomic_write_json(self, data: Any, target_filename: str) -> str:
         """
         Atomically writes a JSON document to storage.

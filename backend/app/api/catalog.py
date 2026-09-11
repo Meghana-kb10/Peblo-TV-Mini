@@ -1,22 +1,27 @@
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.orm import Session
+
+from backend.app.db.session import get_db
+from backend.app.services.catalog_state import load_current_catalogue
 from backend.app.storage import get_storage
 
 router = APIRouter(prefix="/catalog", tags=["Viewer Catalog"])
 
 @router.get("")
 @router.get("/")
-def get_published_catalog(response: Response):
+def get_published_catalog(response: Response, db: Session = Depends(get_db)):
     """
-    Public endpoint serving the atomic published catalogue file.
-    Decoupled from admin and database. High-throughput and CDN-cacheable.
+    Public endpoint serving the atomic published catalogue file. A small
+    publish-run lookup prevents a stale storage object from being treated as
+    the catalogue for a replacement database.
     """
     storage = get_storage()
-    catalog_data = storage.read_json("catalog/catalogue.json")
+    catalog_data, reason = load_current_catalogue(db, storage)
     if not catalog_data:
         raise HTTPException(
             status_code=404,
-            detail="No catalogue has been published yet. Please ask an admin to publish."
+            detail=f"{reason} Please ask an admin to publish."
         )
 
     # Set cache-friendly headers
@@ -28,7 +33,8 @@ def search_catalog(
     q: Optional[str] = Query(None, description="Matches show title, episode title, and categories"),
     category: Optional[str] = Query(None, description="Filter by category"),
     language: Optional[str] = Query(None, description="Filter by language variant (e.g. en, hi)"),
-    section: Optional[str] = Query(None, description="Filter by section (e.g. featured, series)")
+    section: Optional[str] = Query(None, description="Filter by section (e.g. featured, series)"),
+    db: Session = Depends(get_db)
 ):
     """
     Searches the published catalogue with composable filters:
@@ -36,9 +42,9 @@ def search_catalog(
     - category, language, section: compose seamlessly
     """
     storage = get_storage()
-    catalog_data = storage.read_json("catalog/catalogue.json")
+    catalog_data, reason = load_current_catalogue(db, storage)
     if not catalog_data:
-        return {"total_matches": 0, "results": []}
+        raise HTTPException(status_code=404, detail=reason)
 
     # Flatten all shows from all sections
     all_shows: List[Dict[str, Any]] = []
