@@ -88,40 +88,42 @@ export const PublishPage: React.FC = () => {
   const blockingCount = report?.blocking_count ?? 0;
 
   return (
-    <div className="cms-page-container">
-      {/* Page Title */}
-      <div className="page-header-row">
-        <div>
-          <h1 className="page-title">Publish & Pipeline Integrity</h1>
-          <p className="page-subtitle">
+    <div className="canvas-card">
+      {/* Canvas Header */}
+      <div className="canvas-header">
+        <div className="canvas-title-group">
+          <h1 className="canvas-title">Publish & Pipeline Integrity</h1>
+          <p className="canvas-subtitle">
             Compile the atomic static catalogue file for child viewers. Blockers prevent publication to guarantee viewer stability.
           </p>
         </div>
 
         <button
-          className="btn btn-secondary btn-sm"
+          className="btn-dark-pill"
           onClick={() => {
             refetchReport();
             refetchHistory();
           }}
           disabled={isReportFetching}
         >
-          <RefreshCw size={14} className={isReportFetching ? 'spin' : ''} />
+          <RefreshCw size={15} className={isReportFetching ? 'spin' : ''} />
           <span>Refresh Integrity Status</span>
         </button>
       </div>
 
       {/* Permission Denied Alert (Rule 8 Enforcement) */}
       {permissionDeniedMessage && (
-        <div className="permission-banner">
-          <div className="permission-content">
-            <ShieldAlert size={24} className="text-danger" />
+        <div className="permission-alert-banner">
+          <div className="permission-alert-left">
+            <div className="permission-alert-icon-box">
+              <ShieldAlert size={22} className="text-danger" />
+            </div>
             <div>
-              <h3 className="permission-title">HTTP 403 Forbidden — Role Permission Enforced</h3>
-              <p className="permission-desc">{permissionDeniedMessage}</p>
+              <h4 className="permission-alert-title">HTTP 403 Forbidden — Role Permission Enforced</h4>
+              <p className="permission-alert-desc">{permissionDeniedMessage}</p>
             </div>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setRole('admin')}>
+          <button className="btn-dark-pill btn-sm" onClick={() => setRole('admin')}>
             <ShieldCheck size={14} />
             <span>Switch to Admin Role to Publish</span>
           </button>
@@ -130,17 +132,21 @@ export const PublishPage: React.FC = () => {
 
       {/* Publish Success Toast */}
       {publishSuccessToast && (
-        <div className="success-banner">
-          <CheckCircle2 size={24} className="text-success" />
-          <div className="success-content">
-            <h3 className="success-title">{publishSuccessToast.message}</h3>
-            <p className="success-desc">
-              Atomic compile finished in <strong>{publishSuccessToast.durationMs} ms</strong>. Published{' '}
-              <strong>{publishSuccessToast.showCount} shows</strong> and{' '}
-              <strong>{publishSuccessToast.episodeCount} episodes</strong> to storage.
-            </p>
+        <div className="publish-success-banner">
+          <div className="publish-success-left">
+            <div className="publish-success-icon-box">
+              <CheckCircle2 size={24} className="text-success" />
+            </div>
+            <div>
+              <h4 className="publish-success-title">{publishSuccessToast.message}</h4>
+              <p className="publish-success-desc">
+                Atomic compile finished in <strong>{publishSuccessToast.durationMs} ms</strong>. Published{' '}
+                <strong>{publishSuccessToast.showCount} shows</strong> and{' '}
+                <strong>{publishSuccessToast.episodeCount} episodes</strong> to static storage.
+              </p>
+            </div>
           </div>
-          <a href="/catalog" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+          <a href="/catalog" target="_blank" rel="noreferrer" className="btn-dark-pill btn-sm">
             <ExternalLink size={14} />
             <span>View Raw Catalogue JSON</span>
           </a>
@@ -150,16 +156,18 @@ export const PublishPage: React.FC = () => {
       {/* Publish Gatekeeper Card */}
       <div className={`gatekeeper-card ${isPublishable ? 'status-ready' : 'status-blocked'}`}>
         <div className="gatekeeper-left">
-          <div className="status-indicator-icon">
+          <div className="gatekeeper-icon-box">
             {isPublishable ? (
-              <CheckCircle2 size={36} className="text-success" />
+              <CheckCircle2 size={32} className="text-success" />
             ) : (
-              <AlertTriangle size={36} className="text-amber" />
+              <AlertTriangle size={32} className="text-amber" />
             )}
           </div>
-          <div>
-            <div className="status-headline">
-              <h2>{isPublishable ? 'Catalogue Ready for Release' : 'Publishing Blocked by Integrity Gate'}</h2>
+          <div className="gatekeeper-info">
+            <div className="status-headline-row">
+              <h2 className="gatekeeper-title">
+                {isPublishable ? 'Catalogue Ready for Release' : 'Publishing Blocked by Integrity Gate'}
+              </h2>
               <span className={`badge-pill ${isPublishable ? 'badge-ready' : 'badge-blockers'}`}>
                 {isPublishable ? '0 Blockers' : `${blockingCount} Critical Issue${blockingCount === 1 ? '' : 's'}`}
               </span>
@@ -175,7 +183,7 @@ export const PublishPage: React.FC = () => {
         <div className="gatekeeper-actions">
           <div className="publish-button-wrapper">
             <button
-              className={`btn btn-publish ${!isPublishable ? 'btn-disabled' : ''}`}
+              className={`btn-publish-action ${!isPublishable ? 'btn-disabled' : ''}`}
               onClick={handlePublishClick}
               disabled={publishMutation.isPending || (!isPublishable && isAdmin)}
             >
@@ -197,45 +205,58 @@ export const PublishPage: React.FC = () => {
             </button>
 
             {!isPublishable && (
-              <span className="publish-disabled-reason">
-                {blockingCount} blocking validation issue{blockingCount === 1 ? '' : 's'} must be resolved before releasing.
-              </span>
+              <div className="publish-note-badge blocked">
+                <AlertCircle size={13} />
+                <span>{blockingCount} blocking issue{blockingCount === 1 ? '' : 's'} must be resolved.</span>
+              </div>
             )}
 
             {role === 'editor' && (
-              <span className="editor-role-warning">
-                Acting as <strong>Editor</strong>. Clicking publish will demonstrate 403 Forbidden enforcement.
-              </span>
+              <div className="publish-note-badge warning">
+                <ShieldAlert size={13} />
+                <span>Acting as <strong>Editor</strong> (Triggers 403 test).</span>
+              </div>
             )}
           </div>
         </div>
       </div>
 
       {/* Validation Report: Detailed Issues List */}
-      <div className="report-section">
-        <div className="section-header-row">
-          <h2 className="section-title">
-            <FileCheck size={20} className="mr-2 text-accent" />
-            Validation Report
-          </h2>
-          <span className="text-muted-light font-medium">
-            {report?.summary || 'Scanning database integrity...'}
-          </span>
+      <div className="pipeline-section">
+        <div className="pipeline-section-header">
+          <div className="pipeline-section-title-group">
+            <h2 className="pipeline-section-title">
+              <FileCheck size={20} className="text-accent" />
+              <span>Validation Report</span>
+            </h2>
+            <p className="pipeline-section-desc">
+              {report?.summary || 'Scanning database integrity...'}
+            </p>
+          </div>
+          {blockingCount > 0 && (
+            <span className="badge-pill badge-blockers">
+              {blockingCount} Blocker{blockingCount === 1 ? '' : 's'} Detected
+            </span>
+          )}
         </div>
 
         {isReportLoading ? (
-          <div className="table-loading-state">Scanning database for publication blockers...</div>
+          <div className="table-feedback-box">Scanning database for publication blockers...</div>
         ) : reportError ? (
-          <div className="table-error-state">
+          <div className="table-feedback-box error">
             <AlertCircle size={20} />
             <span>Failed to load validation report: {(reportError as any).message}</span>
           </div>
         ) : blockingCount === 0 ? (
           <div className="clean-report-card">
-            <CheckCircle2 size={32} className="text-success" />
+            <div className="clean-report-icon-box">
+              <CheckCircle2 size={26} className="text-success" />
+            </div>
             <div>
-              <h3>All Integrity Checks Passed</h3>
-              <p>No missing sections, incomplete artwork, or colliding language groups detected.</p>
+              <h3 className="clean-report-heading">All Integrity Checks Passed</h3>
+              <p className="clean-report-text">
+                No missing sections, incomplete artwork, or colliding language groups detected.
+              </p>
             </div>
           </div>
         ) : (
@@ -247,7 +268,9 @@ export const PublishPage: React.FC = () => {
                     <Film size={16} />
                     <span>{showTitle}</span>
                   </div>
-                  <span className="badge-pill badge-blockers">{items.length} issue{items.length === 1 ? '' : 's'}</span>
+                  <span className="badge-pill badge-blockers">
+                    {items.length} issue{items.length === 1 ? '' : 's'}
+                  </span>
                 </div>
 
                 <div className="show-blocker-list">
@@ -258,8 +281,8 @@ export const PublishPage: React.FC = () => {
                       </div>
                       <div className="blocker-details">
                         <div className="blocker-meta">
-                          <span className="code-badge">{b.issue_type}</span>
-                          {b.entity_id && <span className="text-muted text-xs">ID: {b.entity_id}</span>}
+                          <span className="blocker-code-badge">{b.issue_type}</span>
+                          {b.entity_id && <span className="blocker-id-text">ID: {b.entity_id}</span>}
                         </div>
                         <p className="blocker-message">{b.message}</p>
                         <div className="blocker-resolution">
@@ -277,32 +300,38 @@ export const PublishPage: React.FC = () => {
       </div>
 
       {/* Publish History Audit Log */}
-      <div className="history-section">
-        <div className="section-header-row">
-          <h2 className="section-title">
-            <History size={20} className="mr-2 text-accent" />
-            Publish Run History (Audit Log)
-          </h2>
-          <span className="text-muted-light font-medium">Recorded runs with executor, duration, and outcome</span>
+      <div className="pipeline-section">
+        <div className="pipeline-section-header">
+          <div className="pipeline-section-title-group">
+            <h2 className="pipeline-section-title">
+              <History size={20} className="text-accent" />
+              <span>Publish Run History (Audit Log)</span>
+            </h2>
+            <p className="pipeline-section-desc">
+              Recorded release events with executor identity, execution time, and storage outcome.
+            </p>
+          </div>
         </div>
 
-        <div className="table-responsive-card">
+        <div className="table-wrapper">
           {isHistoryLoading ? (
-            <div className="table-loading-state">Loading publish run history...</div>
+            <div className="table-feedback-box">Loading publish run history...</div>
           ) : history.length === 0 ? (
-            <div className="table-empty-state">
-              <Clock size={32} className="text-muted" />
-              <h3>No publish runs recorded yet</h3>
-              <p>Trigger your first release above to create an audit record.</p>
+            <div className="table-feedback-box">
+              <Clock size={28} className="text-muted" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+              <p style={{ fontWeight: 600, color: 'var(--text-dark-primary)' }}>No publish runs recorded yet</p>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-dark-secondary)' }}>
+                Trigger your first release above to create an audit record.
+              </span>
             </div>
           ) : (
-            <table className="data-table">
+            <table className="editorial-table">
               <thead>
                 <tr>
                   <th>Status</th>
                   <th>Triggered By</th>
-                  <th>Shows Released</th>
-                  <th>Episodes Released</th>
+                  <th>Shows</th>
+                  <th>Episodes</th>
                   <th>Duration</th>
                   <th>Catalogue Path</th>
                   <th>Timestamp</th>
@@ -317,21 +346,21 @@ export const PublishPage: React.FC = () => {
                       </span>
                     </td>
                     <td>
-                      <span className="font-semibold text-white">{run.triggered_by}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-dark-primary)' }}>{run.triggered_by}</span>
                     </td>
                     <td>{run.show_count}</td>
                     <td>{run.episode_count}</td>
                     <td>
                       <span className="duration-cell">
-                        <Clock size={12} className="text-muted" />
+                        <Clock size={12} className="text-muted mr-1" />
                         {run.duration_ms} ms
                       </span>
                     </td>
                     <td>
-                      <span className="code-badge">{run.catalogue_path || 'N/A'}</span>
+                      <span className="table-code-badge">{run.catalogue_path || 'N/A'}</span>
                     </td>
                     <td>
-                      <span className="text-muted-light text-sm">
+                      <span className="text-timestamp">
                         {run.created_at ? new Date(run.created_at).toLocaleString() : 'N/A'}
                       </span>
                     </td>
