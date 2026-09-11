@@ -1,0 +1,45 @@
+import os
+from pathlib import Path
+from typing import List
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")
+    
+    PROJECT_NAME: str = "Peblo TV Mini API"
+    VERSION: str = "1.0.0"
+    API_V1_STR: str = ""
+    
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./peblo_tv.db")
+    
+    # Storage
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "local")  # "local" or "r2"
+    STORAGE_DIR: str = os.getenv("STORAGE_DIR", str(BASE_DIR / "storage"))
+    
+    # Cloudflare R2 / S3 config (for storage abstraction)
+    R2_ENDPOINT_URL: str = os.getenv("R2_ENDPOINT_URL", "")
+    R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "peblo-tv-catalog")
+    R2_ACCESS_KEY_ID: str = os.getenv("R2_ACCESS_KEY_ID", "")
+    R2_SECRET_ACCESS_KEY: str = os.getenv("R2_SECRET_ACCESS_KEY", "")
+    R2_PUBLIC_BASE_URL: str = os.getenv("R2_PUBLIC_BASE_URL", "https://catalog.peblo.tv")
+
+    # Reference paths
+    REFERENCE_PATH: str = os.getenv("REFERENCE_PATH", str(BASE_DIR / "reference.json"))
+    SEED_PATH: str = os.getenv("SEED_PATH", str(BASE_DIR / "seed_shows.json"))
+    
+    # CORS
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "*"
+    ]
+    
+    # Auth
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "peblo-super-secret-key-change-in-production")
+
+settings = Settings()

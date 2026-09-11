@@ -1,0 +1,171 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ====================================================================
+  # 1. Lint, Typecheck, and Automated Test Suite
+  # ====================================================================
+  lint-and-test:
+    name: Lint & Automated Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: peblo_tv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install ruff
+
+      - name: Backend Linting (Ruff)
+        run: |
+          # Enforce Python clean code standards, unused imports, syntax errors
+          ruff check backend
+
+      - name: Run Backend Pytest Suite
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/peblo_tv_test
+          STORAGE_BACKEND: local
+        run: |
+          pytest backend/tests -v
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            cms/package-lock.json
+            viewer/package-lock.json
+
+      - name: Typecheck & Build CMS Frontend
+        working-directory: ./cms
+        run: |
+          npm ci
+          npm run build
+
+      - name: Typecheck & Build Viewer Frontend
+        working-directory: ./viewer
+        run: |
+          npm ci
+          npm run build
+
+  # ====================================================================
+  # 2. Container Build Validation
+  # ====================================================================
+  build-images:
+    name: Build Container Images
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          tags: peblo-tv-api:${{ github.sha }}
+
+      - name: Build CMS Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./cms
+          file: ./cms/Dockerfile
+          push: false
+          tags: peblo-tv-cms:${{ github.sha }}
+
+      - name: Build Viewer Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./viewer
+          file: ./viewer/Dockerfile
+          push: false
+          tags: peblo-tv-viewer:${{ github.sha }}
+
+  # ====================================================================
+  # 3. Production Deployment Step (Explained & Modelled)
+  # ====================================================================
+  deploy:
+    name: Deploy to Production
+    needs: build-images
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    # Simulated deployment targets (e.g. AWS ECS / Cloud Run + Cloudflare Pages / R2)
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Explain Deployment Architecture & Strategy
+        run: |
+          echo "========================================================================"
+          echo "Peblo TV Mini - Production Zero-Downtime Deployment Flow"
+          echo "========================================================================"
+          echo "1. Registry Push: Tag and push API, CMS, and Viewer images to Container Registry (ECR / Artifact Registry)."
+          echo "2. DB Schema Migration: Run 'alembic upgrade head' as a pre-deploy migration job (Kubernetes Job / ECS Task)."
+          echo "3. API Rolling Update: Deploy new container revisions with blue/green or rolling update."
+          echo "   Traffic only routes to new tasks once the /health endpoint returns 200 OK (DB, Storage & Catalog healthy)."
+          echo "4. Static Assets & CDN: Sync built frontend SPAs to Cloudflare Pages / S3 + CloudFront CDN."
+          echo "5. Catalogue Verification: Run automated synthetic smoke tests against /health and /catalog."
+          echo "========================================================================"
+
+      - name: Simulate Container Image Registry Push
+        run: |
+          echo "Authenticating with container registry..."
+          echo "Pushing images tagged with commit SHA: ${{ github.sha }} and 'latest'..."
+
+      - name: Simulate Database Migrations
+        run: |
+          echo "Running pre-flight database migrations: alembic upgrade head..."
+          echo "Migrations applied successfully."
+
+      - name: Simulate API Rolling Update
+        run: |
+          echo "Triggering rolling deployment on cluster..."
+          echo "Waiting for new containers to pass health checks..."
+          echo "New revision healthy. Traffic transitioned with 0% dropped requests."
+
+      - name: Simulate Synthetic Post-Deploy Smoke Test
+        run: |
+          echo "Probing /health endpoint..."
+          echo "Probing /catalog and /catalog/search..."
+          echo "Smoke tests passed. Deployment successful."
