@@ -1,0 +1,3 @@
+#!/bin/sh
+# Strip trailing slash from API_URL if present
+export API_URL="$(echo "$API_URL" | sed 's:/*$::')"
