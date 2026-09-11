@@ -744,6 +744,8 @@ def resolve_seed_blockers(db: Session = Depends(get_db), user: User = Depends(ge
                 db.add(art)
 
     db.commit()
+    from backend.app.db.seed import sync_generated_artwork
+    sync_generated_artwork(db)
     report = generate_validation_report(db)
     return {
         "success": True,
@@ -784,5 +786,26 @@ def reset_seed_blockers(db: Session = Depends(get_db), user: User = Depends(get_
         "message": "Reset to 5 deliberate seed blockers.",
         "is_publishable": report["is_publishable"],
         "blocking_count": report["blocking_count"]
+    }
+
+@router.post("/artwork/sync-generated")
+def sync_artwork_endpoint(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """
+    Syncs shows and episodes with generated posters, banners, and thumbnails from storage/artwork.
+    """
+    from backend.app.db.seed import sync_generated_artwork
+    result = sync_generated_artwork(db)
+    auto_published = False
+    try:
+        compile_and_publish_catalog(db, triggered_by=user.username)
+        auto_published = True
+    except Exception as e:
+        print(f"[AdminSync] Auto-publish deferred: {e}")
+
+    return {
+        "success": True,
+        "result": result,
+        "catalogue_published": auto_published,
+        "message": f"Synced generated artwork for {result['shows_updated']} show slots. Catalogue auto-published: {auto_published}."
     }
 

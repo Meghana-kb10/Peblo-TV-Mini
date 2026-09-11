@@ -1,14 +1,115 @@
 import json
 import os
 import shutil
+import uuid
+from typing import Dict
 from pathlib import Path
 from PIL import Image
+from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.db.session import SessionLocal, run_migrations
 from backend.app.models.show import Show
 from backend.app.models.season import Season
 from backend.app.models.episode import Episode
 from backend.app.models.artwork import Artwork
+
+def sync_generated_artwork(db: Session) -> Dict[str, int]:
+    """
+    Scans storage/artwork for generated posters, banners, and thumbnails,
+    and updates all matching shows and episodes in the database.
+    """
+    storage_artwork_dir = Path(settings.STORAGE_DIR) / "artwork"
+    if not storage_artwork_dir.exists():
+        return {"shows_updated": 0, "episodes_updated": 0}
+
+    shows = db.query(Show).all()
+    shows_updated = 0
+    episodes_updated = 0
+
+    for show in shows:
+        slug = show.slug
+        # Update show poster & banner
+        for art_type in ["poster", "banner"]:
+            specific_path = storage_artwork_dir / f"{art_type}_{slug}.jpg"
+            if specific_path.exists():
+                try:
+                    with Image.open(specific_path) as im:
+                        w, h = im.size
+                        ratio = round(w / h, 4)
+                        size = os.path.getsize(specific_path)
+                        art = (
+                            db.query(Artwork)
+                            .filter(Artwork.show_id == show.id, Artwork.artwork_type == art_type)
+                            .first()
+                        )
+                        if art:
+                            art.storage_path = f"artwork/{specific_path.name}"
+                            art.url = f"/static/artwork/{specific_path.name}"
+                            art.width = w
+                            art.height = h
+                            art.file_size_bytes = size
+                            art.aspect_ratio = ratio
+                        else:
+                            art = Artwork(
+                                id=str(uuid.uuid4()),
+                                show_id=show.id,
+                                artwork_type=art_type,
+                                storage_path=f"artwork/{specific_path.name}",
+                                url=f"/static/artwork/{specific_path.name}",
+                                width=w,
+                                height=h,
+                                file_size_bytes=size,
+                                aspect_ratio=ratio
+                            )
+                            db.add(art)
+                        shows_updated += 1
+                except Exception as e:
+                    print(f"[ArtworkSync] Error processing {specific_path}: {e}")
+
+        # Update all episodes of this show
+        for season in show.seasons:
+            for ep in season.episodes:
+                for art_type in ["poster", "banner", "thumbnail"]:
+                    prefix = "thumb" if art_type == "thumbnail" else art_type
+                    specific_path = storage_artwork_dir / f"{prefix}_{slug}.jpg"
+                    if specific_path.exists():
+                        try:
+                            with Image.open(specific_path) as im:
+                                w, h = im.size
+                                ratio = round(w / h, 4)
+                                size = os.path.getsize(specific_path)
+                                art = (
+                                    db.query(Artwork)
+                                    .filter(Artwork.episode_id == ep.id, Artwork.artwork_type == art_type)
+                                    .first()
+                                )
+                                if art:
+                                    art.storage_path = f"artwork/{specific_path.name}"
+                                    art.url = f"/static/artwork/{specific_path.name}"
+                                    art.width = w
+                                    art.height = h
+                                    art.file_size_bytes = size
+                                    art.aspect_ratio = ratio
+                                else:
+                                    art = Artwork(
+                                        id=str(uuid.uuid4()),
+                                        episode_id=ep.id,
+                                        artwork_type=art_type,
+                                        storage_path=f"artwork/{specific_path.name}",
+                                        url=f"/static/artwork/{specific_path.name}",
+                                        width=w,
+                                        height=h,
+                                        file_size_bytes=size,
+                                        aspect_ratio=ratio
+                                    )
+                                    db.add(art)
+                                episodes_updated += 1
+                        except Exception as e:
+                            print(f"[ArtworkSync] Error processing episode {ep.id} {specific_path}: {e}")
+
+    db.commit()
+    print(f"[ArtworkSync] Successfully synced {shows_updated} show assets and {episodes_updated} episode assets!")
+    return {"shows_updated": shows_updated, "episodes_updated": episodes_updated}
 
 def seed_database(force: bool = False):
     """
@@ -22,7 +123,8 @@ def seed_database(force: bool = False):
     try:
         existing_shows_count = db.query(Show).count()
         if existing_shows_count > 0 and not force:
-            print(f"[Seed] Database already contains {existing_shows_count} shows. Skipping seed.")
+            print(f"[Seed] Database already contains {existing_shows_count} shows. Syncing generated artwork...")
+            sync_generated_artwork(db)
             return
 
         if force:
@@ -33,6 +135,9 @@ def seed_database(force: bool = False):
             db.query(Show).delete()
             db.commit()
 
+        storage_artwork_dir = Path(settings.STORAGE_DIR) / "artwork"
+        storage_artwork_dir.mkdir(parents=True, exist_ok=True)
+
         seed_file = Path(settings.SEED_PATH)
         if not seed_file.exists():
             print(f"[Seed] Error: Seed file {seed_file} does not exist.")
@@ -42,10 +147,6 @@ def seed_database(force: bool = False):
             episodes_data = json.load(f)
 
         print(f"[Seed] Ingesting {len(episodes_data)} episode rows from {seed_file}...")
-
-        # Setup storage directory for artwork assets
-        storage_artwork_dir = Path(settings.STORAGE_DIR) / "artwork"
-        storage_artwork_dir.mkdir(parents=True, exist_ok=True)
 
         base_dir = Path(settings.REFERENCE_PATH).parent
         sample_assets = {
@@ -92,9 +193,26 @@ def seed_database(force: bool = False):
                 db.flush()
                 shows_cache[slug] = show
 
-                # Create show-level artwork if available
+                # Create show-level artwork if available (prefer generated show-specific assets)
                 for art_type in ["poster", "banner"]:
-                    if art_type in asset_meta:
+                    specific_path = storage_artwork_dir / f"{art_type}_{slug}.jpg"
+                    if specific_path.exists():
+                        with Image.open(specific_path) as im:
+                            w, h = im.size
+                            ratio = round(w / h, 4)
+                            size = os.path.getsize(specific_path)
+                            show_art = Artwork(
+                                show_id=show.id,
+                                artwork_type=art_type,
+                                storage_path=f"artwork/{specific_path.name}",
+                                url=f"/static/artwork/{specific_path.name}",
+                                width=w,
+                                height=h,
+                                file_size_bytes=size,
+                                aspect_ratio=ratio
+                            )
+                            db.add(show_art)
+                    elif art_type in asset_meta:
                         meta = asset_meta[art_type]
                         show_art = Artwork(
                             show_id=show.id,
@@ -143,7 +261,25 @@ def seed_database(force: bool = False):
             # Episode artwork
             available_art = row.get("artwork_available", [])
             for art_type in available_art:
-                if art_type in asset_meta:
+                prefix = "thumb" if art_type == "thumbnail" else art_type
+                specific_path = storage_artwork_dir / f"{prefix}_{slug}.jpg"
+                if specific_path.exists():
+                    with Image.open(specific_path) as im:
+                        w, h = im.size
+                        ratio = round(w / h, 4)
+                        size = os.path.getsize(specific_path)
+                        ep_art = Artwork(
+                            episode_id=ep.id,
+                            artwork_type=art_type,
+                            storage_path=f"artwork/{specific_path.name}",
+                            url=f"/static/artwork/{specific_path.name}",
+                            width=w,
+                            height=h,
+                            file_size_bytes=size,
+                            aspect_ratio=ratio
+                        )
+                        db.add(ep_art)
+                elif art_type in asset_meta:
                     meta = asset_meta[art_type]
                     ep_art = Artwork(
                         episode_id=ep.id,
@@ -159,6 +295,7 @@ def seed_database(force: bool = False):
 
         db.commit()
         print(f"[Seed] Successfully seeded {len(shows_cache)} shows, {len(seasons_cache)} seasons, and {len(episodes_data)} episodes!")
+        sync_generated_artwork(db)
 
     except Exception as e:
         db.rollback()

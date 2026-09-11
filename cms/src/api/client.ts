@@ -249,3 +249,16 @@ export async function fetchPublishHistory(limit: number = 20): Promise<PublishRu
   });
   return handleResponse<PublishRun[]>(res);
 }
+
+export async function syncGeneratedArtwork(): Promise<{
+  success: boolean;
+  result: { shows_updated: number; episodes_updated: number };
+  catalogue_published: boolean;
+  message: string;
+}> {
+  const res = await fetch(`${BASE_URL}/admin/artwork/sync-generated`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  });
+  return handleResponse(res);
+}

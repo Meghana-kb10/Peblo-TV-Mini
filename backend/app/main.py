@@ -15,6 +15,19 @@ async def lifespan(app: FastAPI):
     # Seed startup applies Alembic migrations before importing content.
     print(f"[{settings.PROJECT_NAME}] Starting up. Applying database migrations...")
     seed_database(force=False)
+
+    print(f"[{settings.PROJECT_NAME}] Syncing generated show artwork...")
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.seed import sync_generated_artwork
+    from backend.app.services.publisher import compile_and_publish_catalog
+    with SessionLocal() as db:
+        sync_generated_artwork(db)
+        try:
+            compile_and_publish_catalog(db, triggered_by="system_startup_sync")
+            print(f"[{settings.PROJECT_NAME}] Catalogue successfully auto-published with generated artwork!")
+        except Exception as e:
+            print(f"[{settings.PROJECT_NAME}] Catalogue auto-publish deferred: {e}")
+
     yield
     print(f"[{settings.PROJECT_NAME}] Shutting down.")
 
