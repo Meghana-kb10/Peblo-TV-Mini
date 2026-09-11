@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/catalog/:path*",
+      "destination": "https://peblo-tv-mini-lvtw.onrender.com/catalog/:path*"
+    },
+    {
+      "source": "/catalog",
+      "destination": "https://peblo-tv-mini-lvtw.onrender.com/catalog"
+    },
+    {
+      "source": "/static/:path*",
+      "destination": "https://peblo-tv-mini-lvtw.onrender.com/static/:path*"
+    }
+  ]
+}
